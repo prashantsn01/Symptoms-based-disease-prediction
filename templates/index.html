@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Disease Prediction System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Background Animation -->
+    <div class="background-animation">
+        <div class="shape"></div>
+        <div class="shape"></div>
+        <div class="shape"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <i class="fas fa-heartbeat"></i>
+            <span>HealthAI</span>
+        </div>
+        <div class="nav-links">
+            <a href="#predict-section" class="nav-link active" data-section="predict">
+                <i class="fas fa-stethoscope"></i> Predict
+            </a>
+            <a href="#info-section" class="nav-link" data-section="info">
+                <i class="fas fa-database"></i> Dataset Info
+            </a>
+            <a href="#about-section" class="nav-link" data-section="about">
+                <i class="fas fa-users"></i> About Us
+            </a>
+        </div>
+        <button class="nav-toggle" id="navToggle">
+            <i class="fas fa-bars"></i>
+        </button>
+    </nav>
+
+    <div class="container">
+
+        <!-- ===================== PREDICT SECTION ===================== -->
+        <section id="predict-section" class="page-section active">
+            <header>
+                <div class="logo">
+                    <i class="fas fa-heartbeat"></i>
+                </div>
+                <h1>AI Disease Prediction</h1>
+                <p>Advanced Hybrid Deep Learning for Health Diagnostics</p>
+            </header>
+
+            <!-- Prediction Mode Tabs -->
+            <div class="mode-tabs">
+                <button class="mode-tab active" data-mode="select">
+                    <i class="fas fa-list-check"></i> Select Symptoms
+                </button>
+                <button class="mode-tab" data-mode="nlp">
+                    <i class="fas fa-comment-medical"></i> Describe in English
+                </button>
+            </div>
+
+            <!-- Select Mode -->
+            <div class="card" id="selectMode">
+                <div class="card-header">
+                    <i class="fas fa-stethoscope"></i>
+                    <h2>Select Your Symptoms</h2>
+                    <p class="card-subtitle">Search and select from 377 symptoms covering 773 diseases</p>
+                </div>
+
+                <form id="predictionForm">
+                    <div class="form-group">
+                        <label for="symptoms-select">
+                            <i class="fas fa-search"></i> Search and Select Symptoms
+                        </label>
+                        <select id="symptoms-select" multiple>
+                            {% for symptom in symptoms %}
+                            <option value="{{ symptom }}">{{ symptom }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="help-text">
+                            <i class="fas fa-info-circle"></i>
+                            Start typing to search. Select multiple symptoms for better accuracy.
+                        </div>
+                    </div>
+
+                    <div class="selected-symptoms" id="selectedSymptomsDisplay">
+                        <div class="symptoms-label">
+                            <i class="fas fa-check-circle"></i>
+                            <span id="symptomCount">0</span> Symptoms Selected
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="predictBtn">
+                        <i class="fas fa-brain"></i>
+                        <span>Analyze &amp; Predict</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- NLP Mode -->
+            <div class="card" id="nlpMode" style="display:none;">
+                <div class="card-header">
+                    <i class="fas fa-comment-medical"></i>
+                    <h2>Describe Your Symptoms</h2>
+                    <p class="card-subtitle">Tell us how you feel in plain English — our AI extracts symptoms automatically</p>
+                </div>
+
+                <!-- Backend Toggle -->
+                <div class="nlp-backend-toggle">
+                    <label class="backend-option">
+                        <input type="radio" name="nlp-backend" value="transformer" checked>
+                        <span class="backend-label">
+                            <i class="fas fa-microchip"></i> Offline (Sentence Transformer)
+                        </span>
+                        <span class="backend-desc">Fast, private, no API key needed</span>
+                    </label>
+                    <label class="backend-option">
+                        <input type="radio" name="nlp-backend" value="llm">
+                        <span class="backend-label">
+                            <i class="fas fa-cloud"></i> LLM (Google Gemini)
+                        </span>
+                        <span class="backend-desc">More accurate, requires API key</span>
+                    </label>
+                </div>
+
+                <form id="nlpForm">
+                    <div class="form-group">
+                        <label for="nlpTextarea">
+                            <i class="fas fa-pen"></i> Describe how you feel
+                        </label>
+                        <div class="nlp-textarea-wrapper">
+                            <textarea id="nlpTextarea" class="nlp-textarea" placeholder="Example: I've been having a headache for 3 days, feeling nauseous, and my eyes are sensitive to light. I also have a mild fever and body aches..."></textarea>
+                        </div>
+                        <div class="help-text">
+                            <i class="fas fa-info-circle"></i>
+                            Describe all your symptoms in detail. The AI will identify and match them to known medical symptoms.
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="nlpPredictBtn">
+                        <i class="fas fa-brain"></i>
+                        <span>Extract Symptoms &amp; Predict</span>
+                    </button>
+                </form>
+
+                <!-- Extracted Symptoms Display -->
+                <div id="nlpExtractedSection" class="nlp-extracted-section" style="display:none;">
+                    <div class="extracted-header">
+                        <i class="fas fa-check-double"></i>
+                        <h3>Extracted Symptoms (<span id="nlpMatchCount">0</span>)</h3>
+                        <span class="extracted-backend-badge" id="nlpBackendBadge"></span>
+                    </div>
+                    <div class="extracted-symptoms-list" id="nlpExtractedList"></div>
+                    <div class="extracted-confidence">
+                        <i class="fas fa-chart-line"></i>
+                        Confidence: <span id="nlpConfidence">0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading Spinner -->
+            <div id="loadingSpinner" class="loading-spinner" style="display: none;">
+                <div class="spinner"></div>
+                <p>Analyzing symptoms with hybrid AI model...</p>
+            </div>
+
+            <!-- Result Section -->
+            <div id="resultSection" class="result-section" style="display: none;">
+                <div class="result-card">
+                    <div class="result-icon">
+                        <i class="fas fa-clipboard-check"></i>
+                    </div>
+                    <h3>Prediction Result</h3>
+                    <div class="disease-result" id="diseaseResult"></div>
+                    <div class="result-meta">
+                        <span><i class="fas fa-list-ul"></i> Based on <span id="resultSymptomCount"></span> symptoms</span>
+                    </div>
+                    <div class="result-disclaimer">
+                        <i class="fas fa-exclamation-circle"></i>
+                        This is an AI-based prediction for educational purposes. Please consult a healthcare professional for diagnosis.
+                    </div>
+                    <button class="btn btn-secondary" onclick="resetForm()">
+                        <i class="fas fa-redo"></i> New Prediction
+                    </button>
+                </div>
+            </div>
+
+            <!-- Error Section -->
+            <div id="errorSection" class="error-section" style="display: none;">
+                <div class="error-card">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h3>Error</h3>
+                    <p id="errorMessage"></p>
+                    <button class="btn btn-secondary" onclick="hideError()">
+                        <i class="fas fa-times"></i> Close
+                    </button>
+                </div>
+            </div>
+
+            <!-- Feature Cards -->
+            <div class="features-grid">
+                <div class="feature-card">
+                    <i class="fas fa-brain"></i>
+                    <h4>3 Deep Learning Models</h4>
+                    <p>Dense NN, Conv1D, and Attention-based neural networks</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-cogs"></i>
+                    <h4>5 ML Classifiers</h4>
+                    <p>Logistic Regression, Naive Bayes, Decision Tree, Random Forest, XGBoost</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-layer-group"></i>
+                    <h4>Hybrid Ensemble</h4>
+                    <p>Combines all 8 models via weighted probability averaging</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===================== INFO SECTION ===================== -->
+        <section id="info-section" class="page-section">
+            <header>
+                <div class="logo">
+                    <i class="fas fa-database"></i>
+                </div>
+                <h1>Dataset Information</h1>
+                <p>Comprehensive coverage of symptoms and diseases</p>
+            </header>
+
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-virus"></i></div>
+                    <div class="stat-number" id="statDiseases">773</div>
+                    <div class="stat-label">Diseases</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-notes-medical"></i></div>
+                    <div class="stat-number" id="statSymptoms">377</div>
+                    <div class="stat-label">Symptoms</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-table"></i></div>
+                    <div class="stat-number">246K+</div>
+                    <div class="stat-label">Training Samples</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-percentage"></i></div>
+                    <div class="stat-number">99%+</div>
+                    <div class="stat-label">Target Accuracy</div>
+                </div>
+            </div>
+
+            <!-- Search & Filter -->
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-search"></i>
+                    <h2>Explore Dataset</h2>
+                </div>
+                <div class="info-tabs">
+                    <button class="info-tab active" data-info="diseases">
+                        <i class="fas fa-virus"></i> Diseases (<span id="diseaseCount">773</span>)
+                    </button>
+                    <button class="info-tab" data-info="symptoms">
+                        <i class="fas fa-notes-medical"></i> Symptoms (<span id="symptomCountInfo">377</span>)
+                    </button>
+                </div>
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="infoSearch" placeholder="Search diseases or symptoms...">
+                    <button class="search-clear" id="searchClear" style="display:none;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="infoListContainer" class="info-list-container">
+                    <div class="info-list" id="infoList">
+                        <div class="info-loading">
+                            <div class="spinner small"></div>
+                            <p>Loading dataset information...</p>
+                        </div>
+                    </div>
+                    <div class="info-list-footer" id="infoListFooter"></div>
+                </div>
+            </div>
+
+            <!-- Model Architecture -->
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-project-diagram"></i>
+                    <h2>Model Architecture</h2>
+                </div>
+                <div class="architecture-grid">
+                    <div class="arch-card dl">
+                        <div class="arch-badge">Deep Learning</div>
+                        <h4><i class="fas fa-network-wired"></i> Dense Neural Network</h4>
+                        <p>256 &rarr; 128 neurons with dropout regularization. Captures non-linear symptom patterns.</p>
+                    </div>
+                    <div class="arch-card dl">
+                        <div class="arch-badge">Deep Learning</div>
+                        <h4><i class="fas fa-wave-square"></i> Conv1D Network</h4>
+                        <p>1D convolution with 64 filters. Identifies local symptom clusters and co-occurrence patterns.</p>
+                    </div>
+                    <div class="arch-card dl">
+                        <div class="arch-badge">Deep Learning</div>
+                        <h4><i class="fas fa-bullseye"></i> Attention Model</h4>
+                        <p>Self-attention mechanism that weighs symptom importance dynamically for each prediction.</p>
+                    </div>
+                    <div class="arch-card ml">
+                        <div class="arch-badge">Machine Learning</div>
+                        <h4><i class="fas fa-chart-line"></i> Logistic Regression</h4>
+                        <p>Lightweight linear classifier for structured symptom data.</p>
+                    </div>
+                    <div class="arch-card ml">
+                        <div class="arch-badge">Machine Learning</div>
+                        <h4><i class="fas fa-chart-bar"></i> Naive Bayes</h4>
+                        <p>Probabilistic classifier fast on sparse symptom vectors.</p>
+                    </div>
+                    <div class="arch-card ml">
+                        <div class="arch-badge">Machine Learning</div>
+                        <h4><i class="fas fa-sitemap"></i> Decision Tree</h4>
+                        <p>Rule-based splitting for interpretable symptom analysis.</p>
+                    </div>
+                    <div class="arch-card ml">
+                        <div class="arch-badge">Machine Learning</div>
+                        <h4><i class="fas fa-tree"></i> Random Forest</h4>
+                        <p>Ensemble of 100 decision trees with parallel processing.</p>
+                    </div>
+                    <div class="arch-card ml">
+                        <div class="arch-badge">Machine Learning</div>
+                        <h4><i class="fas fa-rocket"></i> XGBoost</h4>
+                        <p>Gradient boosted trees for high-accuracy multi-class prediction.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===================== ABOUT SECTION ===================== -->
+        <section id="about-section" class="page-section">
+            <header>
+                <div class="logo">
+                    <i class="fas fa-users"></i>
+                </div>
+                <h1>About This Project</h1>
+                <p>Symptoms-Based Disease Prediction Using Hybrid Deep Learning</p>
+            </header>
+
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-graduation-cap"></i>
+                    <h2>Project Overview</h2>
+                </div>
+                <div class="about-content">
+                    <p>This project addresses a critical challenge in healthcare: <strong>accurate and timely disease diagnosis based on symptoms</strong>. Traditional diagnosis depends on clinical expertise which may not always be available, especially in under-resourced areas.</p>
+                    <p>Our system uses a <strong>hybrid ensemble</strong> of 3 Deep Learning models (Dense NN, Conv1D, Attention) and 5 Machine Learning classifiers (Logistic Regression, Naive Bayes, Decision Tree, Random Forest, XGBoost) to analyze symptom patterns and predict diseases with high accuracy.</p>
+                    <p>The ensemble approach ensures that predictions are <strong>context-aware and statistically robust</strong> by combining outputs from all 8 models via probability averaging, significantly reducing the influence of occasional errors from any single classifier.</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-bullseye"></i>
+                    <h2>Objectives &amp; Motivation</h2>
+                </div>
+                <div class="objectives-grid">
+                    <div class="objective-item">
+                        <div class="objective-icon"><i class="fas fa-database"></i></div>
+                        <h4>Data Collection</h4>
+                        <p>Collecting and preparing symptom-based datasets from reliable medical repositories covering 773 diseases and 377 symptoms.</p>
+                    </div>
+                    <div class="objective-item">
+                        <div class="objective-icon"><i class="fas fa-code"></i></div>
+                        <h4>Hybrid Model Design</h4>
+                        <p>Designing an ensemble model incorporating both deep learning and classical ML algorithms for multi-angle symptom analysis.</p>
+                    </div>
+                    <div class="objective-item">
+                        <div class="objective-icon"><i class="fas fa-chart-line"></i></div>
+                        <h4>Performance Evaluation</h4>
+                        <p>Evaluating performance with accuracy, precision, recall, and F1-score against standalone approaches to demonstrate improvement.</p>
+                    </div>
+                    <div class="objective-item">
+                        <div class="objective-icon"><i class="fas fa-globe"></i></div>
+                        <h4>Web Deployment</h4>
+                        <p>Deploying through a Flask web application for easy real-time interaction by medical practitioners and individuals.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-chart-bar"></i>
+                    <h2>Performance Targets</h2>
+                </div>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">&ge; 99%</div>
+                        <div class="metric-label">Accuracy</div>
+                        <div class="metric-desc">Overall classification accuracy across diseases</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">&ge; 0.95</div>
+                        <div class="metric-label">F1-Score</div>
+                        <div class="metric-desc">Balance between precision and recall</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">&ge; 0.96</div>
+                        <div class="metric-label">Precision</div>
+                        <div class="metric-desc">Correct positive identification rate</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">&lt; 1 sec</div>
+                        <div class="metric-label">Latency</div>
+                        <div class="metric-desc">Real-time prediction speed</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-road"></i>
+                    <h2>Future Enhancements</h2>
+                </div>
+                <div class="future-grid">
+                    <div class="future-item">
+                        <div class="future-icon"><i class="fas fa-comment-dots"></i></div>
+                        <h4>NLP Integration</h4>
+                        <p>Natural language processing using BERT/GPT-based encoders for interpreting free-text symptom descriptions conversationally.</p>
+                        <span class="future-badge planned">In Progress</span>
+                    </div>
+                    <div class="future-item">
+                        <div class="future-icon"><i class="fas fa-x-ray"></i></div>
+                        <h4>Multimodal Diagnostics</h4>
+                        <p>Incorporating medical images such as X-rays or ECG signals to validate and enhance predictions.</p>
+                        <span class="future-badge">Planned</span>
+                    </div>
+                    <div class="future-item">
+                        <div class="future-icon"><i class="fas fa-wifi"></i></div>
+                        <h4>IoT Integration</h4>
+                        <p>Real-time health monitoring through wearable sensors feeding continuous symptom data.</p>
+                        <span class="future-badge">Planned</span>
+                    </div>
+                    <div class="future-item">
+                        <div class="future-icon"><i class="fas fa-expand-arrows-alt"></i></div>
+                        <h4>Expanded Disease Catalogue</h4>
+                        <p>Including rare, emerging, and region-specific diseases for broader applicability.</p>
+                        <span class="future-badge">Planned</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-university"></i>
+                    <h2>Academic Details</h2>
+                </div>
+                <div class="about-content academic-info">
+                    <div class="academic-grid">
+                        <div class="academic-item">
+                            <span class="academic-label">Department</span>
+                            <span class="academic-value">Dept. of ISE, DSCE</span>
+                        </div>
+                        <div class="academic-item">
+                            <span class="academic-label">Academic Year</span>
+                            <span class="academic-value">2025-26</span>
+                        </div>
+                        <div class="academic-item">
+                            <span class="academic-label">Project Title</span>
+                            <span class="academic-value">Symptoms-Based Disease Prediction Using Hybrid Deep Learning Models</span>
+                        </div>
+                        <div class="academic-item">
+                            <span class="academic-label">Technology Stack</span>
+                            <span class="academic-value">Python, TensorFlow, Keras, Scikit-learn, XGBoost, Flask, Pandas, NumPy</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer>
+            <div class="footer-content">
+                <div class="footer-item">
+                    <i class="fas fa-shield-alt"></i>
+                    <p>Secure &amp; Private</p>
+                </div>
+                <div class="footer-item">
+                    <i class="fas fa-robot"></i>
+                    <p>8-Model Hybrid AI</p>
+                </div>
+                <div class="footer-item">
+                    <i class="fas fa-chart-line"></i>
+                    <p>99%+ Accuracy</p>
+                </div>
+            </div>
+            <p class="disclaimer">
+                <i class="fas fa-info-circle"></i>
+                This system is for educational purposes only. Always consult with healthcare professionals for medical advice.
+            </p>
+            <p class="copyright">
+                &copy; 2025-26 Dept. of ISE, DSCE &mdash; Symptoms-Based Disease Prediction
+            </p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+    <script>
+        // ===================== NAVIGATION =====================
+        const navLinks = document.querySelectorAll('.nav-link');
+        const sections = document.querySelectorAll('.page-section');
+        const navToggle = document.getElementById('navToggle');
+
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const target = link.dataset.section;
+                
+                navLinks.forEach(l => l.classList.remove('active'));
+                link.classList.add('active');
+                
+                sections.forEach(s => s.classList.remove('active'));
+                document.getElementById(`${target}-section`).classList.add('active');
+                
+                document.querySelector('.nav-links').classList.remove('open');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                
+                if (target === 'info' && !datasetLoaded) {
+                    loadDatasetInfo();
+                }
+            });
+        });
+
+        navToggle.addEventListener('click', () => {
+            document.querySelector('.nav-links').classList.toggle('open');
+        });
+
+        // ===================== MODE TABS =====================
+        const modeTabs = document.querySelectorAll('.mode-tab');
+        modeTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                if (tab.disabled) return;
+                modeTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                const mode = tab.dataset.mode;
+                document.getElementById('selectMode').style.display = mode === 'select' ? 'block' : 'none';
+                document.getElementById('nlpMode').style.display = mode === 'nlp' ? 'block' : 'none';
+            });
+        });
+
+        // ===================== CHOICES.JS =====================
+        const element = document.getElementById('symptoms-select');
+        const choices = new Choices(element, {
+            removeItemButton: true,
+            searchEnabled: true,
+            searchPlaceholderValue: 'Type to search symptoms...',
+            placeholder: true,
+            placeholderValue: 'Start typing to search symptoms...',
+            noResultsText: 'No symptoms found',
+            itemSelectText: 'Click to select',
+            maxItemCount: -1,
+            searchResultLimit: 10,
+            shouldSort: true,
+            sorter: (a, b) => a.label.localeCompare(b.label)
+        });
+
+        element.addEventListener('change', () => {
+            const count = choices.getValue().length;
+            document.getElementById('symptomCount').textContent = count;
+        });
+
+        // ===================== PREDICTION =====================
+        document.getElementById('predictionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const selectedSymptoms = choices.getValue().map(item => item.value);
+            
+            if (selectedSymptoms.length === 0) {
+                showError('Please select at least one symptom.');
+                return;
+            }
+
+            document.getElementById('loadingSpinner').style.display = 'block';
+            document.getElementById('resultSection').style.display = 'none';
+            document.getElementById('errorSection').style.display = 'none';
+            document.getElementById('predictBtn').disabled = true;
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symptoms: selectedSymptoms })
+                });
+                const data = await response.json();
+
+                document.getElementById('loadingSpinner').style.display = 'none';
+                document.getElementById('predictBtn').disabled = false;
+
+                if (response.ok) {
+                    document.getElementById('diseaseResult').textContent = data.disease;
+                    document.getElementById('resultSymptomCount').textContent = data.symptoms_count;
+                    document.getElementById('resultSection').style.display = 'block';
+                    document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth' });
+                } else {
+                    showError(data.error || 'An error occurred during prediction.');
+                }
+            } catch (error) {
+                document.getElementById('loadingSpinner').style.display = 'none';
+                document.getElementById('predictBtn').disabled = false;
+                showError('Network error. Please check your connection.');
+            }
+        });
+
+        function showError(message) {
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('errorSection').style.display = 'block';
+            document.getElementById('errorSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function hideError() {
+            document.getElementById('errorSection').style.display = 'none';
+        }
+
+        function resetForm() {
+            choices.removeActiveItems();
+            document.getElementById('symptomCount').textContent = '0';
+            document.getElementById('resultSection').style.display = 'none';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // ===================== DATASET INFO =====================
+        let datasetLoaded = false;
+        let datasetCache = { diseases: [], symptoms: [] };
+        let currentInfoTab = 'diseases';
+
+        async function loadDatasetInfo() {
+            try {
+                const res = await fetch('/api/dataset-info');
+                const data = await res.json();
+                datasetCache.diseases = data.diseases;
+                datasetCache.symptoms = data.symptoms;
+                
+                document.getElementById('statDiseases').textContent = data.total_diseases;
+                document.getElementById('statSymptoms').textContent = data.total_symptoms;
+                document.getElementById('diseaseCount').textContent = data.total_diseases;
+                document.getElementById('symptomCountInfo').textContent = data.total_symptoms;
+                
+                datasetLoaded = true;
+                renderInfoList();
+            } catch (e) {
+                document.getElementById('infoList').innerHTML = '<p class="info-error">Failed to load dataset info.</p>';
+            }
+        }
+
+        function renderInfoList(filter = '') {
+            const list = currentInfoTab === 'diseases' ? datasetCache.diseases : datasetCache.symptoms;
+            const filtered = filter
+                ? list.filter(item => item.toLowerCase().includes(filter.toLowerCase()))
+                : list;
+            
+            const container = document.getElementById('infoList');
+            
+            if (filtered.length === 0) {
+                container.innerHTML = '<p class="info-empty"><i class="fas fa-search"></i> No matches found</p>';
+                document.getElementById('infoListFooter').textContent = '';
+                return;
+            }
+            
+            const displayItems = filtered.slice(0, 100);
+            const icon = currentInfoTab === 'diseases' ? 'fa-virus' : 'fa-notes-medical';
+            
+            container.innerHTML = displayItems.map(item =>
+                `<div class="info-item">
+                    <i class="fas ${icon}"></i>
+                    <span>${item}</span>
+                </div>`
+            ).join('');
+            
+            const footer = document.getElementById('infoListFooter');
+            if (filtered.length > 100) {
+                footer.textContent = `Showing 100 of ${filtered.length} results. Use search to narrow down.`;
+            } else {
+                footer.textContent = `Showing ${filtered.length} of ${list.length} total ${currentInfoTab}`;
+            }
+        }
+
+        // Info tab switching
+        document.querySelectorAll('.info-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.info-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                currentInfoTab = tab.dataset.info;
+                document.getElementById('infoSearch').value = '';
+                document.getElementById('searchClear').style.display = 'none';
+                renderInfoList();
+            });
+        });
+
+        // Search functionality
+        const searchInput = document.getElementById('infoSearch');
+        const searchClear = document.getElementById('searchClear');
+        
+        searchInput.addEventListener('input', (e) => {
+            const val = e.target.value;
+            searchClear.style.display = val ? 'block' : 'none';
+            renderInfoList(val);
+        });
+        
+        searchClear.addEventListener('click', () => {
+            searchInput.value = '';
+            searchClear.style.display = 'none';
+            renderInfoList();
+        });
+
+        // ===================== NLP PREDICTION =====================
+        document.getElementById('nlpForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const text = document.getElementById('nlpTextarea').value.trim();
+            const backend = document.querySelector('input[name="nlp-backend"]:checked').value;
+
+            if (!text) {
+                showError('Please describe your symptoms first.');
+                return;
+            }
+
+            document.getElementById('loadingSpinner').style.display = 'block';
+            document.getElementById('loadingSpinner').querySelector('p').textContent =
+                `Analyzing with ${backend === 'llm' ? 'Gemini LLM' : 'Sentence Transformer'}...`;
+            document.getElementById('resultSection').style.display = 'none';
+            document.getElementById('errorSection').style.display = 'none';
+            document.getElementById('nlpExtractedSection').style.display = 'none';
+            document.getElementById('nlpPredictBtn').disabled = true;
+
+            try {
+                const response = await fetch('/predict-nlp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, backend })
+                });
+                const data = await response.json();
+
+                document.getElementById('loadingSpinner').style.display = 'none';
+                document.getElementById('nlpPredictBtn').disabled = false;
+
+                if (response.ok) {
+                    // Show extracted symptoms
+                    const extractedList = document.getElementById('nlpExtractedList');
+                    extractedList.innerHTML = data.matched_symptoms.map(s =>
+                        `<span class="extracted-symptom-tag"><i class="fas fa-check-circle"></i> ${s}</span>`
+                    ).join('');
+                    document.getElementById('nlpMatchCount').textContent = data.symptoms_count;
+                    document.getElementById('nlpConfidence').textContent =
+                        (data.confidence * 100).toFixed(1) + '%';
+                    document.getElementById('nlpBackendBadge').textContent =
+                        data.backend === 'llm' ? 'Gemini LLM' : 'Transformer';
+                    document.getElementById('nlpBackendBadge').className =
+                        'extracted-backend-badge badge-' + data.backend;
+                    document.getElementById('nlpExtractedSection').style.display = 'block';
+
+                    // Show disease prediction
+                    document.getElementById('diseaseResult').textContent = data.disease;
+                    document.getElementById('resultSymptomCount').textContent = data.symptoms_count;
+                    document.getElementById('resultSection').style.display = 'block';
+                    document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth' });
+                } else {
+                    showError(data.error || 'Failed to extract symptoms.');
+                }
+            } catch (error) {
+                document.getElementById('loadingSpinner').style.display = 'none';
+                document.getElementById('nlpPredictBtn').disabled = false;
+                showError('Network error. Please check your connection.');
+            }
+        });
+    </script>
+</body>
+</html>
